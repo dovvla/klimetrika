@@ -1,0 +1,23 @@
+services:
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_storage:/data
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: adminadmin
+    command: server --console-address ":9001" /data
+
+  populatebuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    volumes:
+      - ./klimerko_baza:/tmp/data
+      - ./entrypoint-minio.sh:/entrypoint-minio.sh:ro
+    entrypoint: [ "sh", "entrypoint-minio.sh" ]
+volumes:
+  minio_storage: {}
