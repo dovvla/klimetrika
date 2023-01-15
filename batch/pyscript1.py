@@ -9,6 +9,7 @@ from pyspark import SparkConf, SparkContext, SQLContext
 conf = (
     SparkConf()
     .setAppName("Spark minIO Test")
+    .set("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.2.2")
     .set("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
     .set("spark.hadoop.fs.s3a.access.key", "admin")
     .set("spark.hadoop.fs.s3a.secret.key", "adminadmin")
@@ -22,8 +23,18 @@ conf = (
 )
 sc = SparkContext(conf=conf).getOrCreate()
 sqlContext = SQLContext(sc)
-# print(sc.wholeTextFiles('s3a://raw/data/klimerko_raw_data').collect())
-# df = sqlContext.read.csv("s3a://raw/data/decazavazduh.csv", header=True)
+
+
+def one_asset_to_csv(df: "DataFrame", asset_name: str):
+    df.filter(col("asset_title") == asset_name).select(
+        "asset_value.Value", "asset_value.Time", "_id", "device_title"
+    ).write.options(header="True", delimiter=",").format("csv").save(
+        f"s3a://transform/data/{asset_name}.csv", mode="overwrite"
+    )
+
+
 df = sqlContext.read.json("s3a://raw/data/klimerko_raw_data_pp")
-df.printSchema()
-df.show()
+asset_titles = df.select("asset_title").distinct().collect()
+asset_titles = [v["asset_title"] for v in asset_titles]
+for at in asset_titles:
+    one_asset_to_csv(df, at)
