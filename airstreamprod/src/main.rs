@@ -35,12 +35,12 @@ async fn main() {
     for device in devices {
         set.spawn(async move {
             let mut previous_time: Option<String> = None;
-            let client = reqwest::Client::new();
             let mut producer = Producer::from_hosts(vec!["localhost:9092".to_owned()])
                 .with_ack_timeout(Duration::from_secs(1))
                 .with_required_acks(RequiredAcks::One)
                 .create()
                 .expect("kafka connection");
+            let client = reqwest::Client::new();
             loop {
                 sleep(Duration::from_millis(10000)).await;
                 let reading = client
