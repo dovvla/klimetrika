@@ -1,8 +1,7 @@
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::collections::HashMap;
 
 use kafka::producer::{Producer, Record, RequiredAcks};
-use tokio::sync::RwLock;
+use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 use tokio::time::{sleep, Duration};
 
@@ -15,6 +14,25 @@ fn get_time_from_reading(reading: &str) -> Option<String> {
     read_values
         .get(1)
         .map(|row| row.split_once('|').unwrap().0.to_string())
+}
+
+fn reading_to_json(reading: &str, device: &str) -> String {
+    let read_values: Vec<String> = reading
+        .split('\n')
+        .into_iter()
+        .map(|x| x.to_string())
+        .collect();
+
+    let mut map: HashMap<&str, &str> = read_values
+        .get(0)
+        .expect("first row")
+        .split('|')
+        .zip(read_values.get(1).expect("second row").split('|'))
+        .collect();
+
+    map.insert("deviceId", device);
+
+    serde_json::to_string(&map).unwrap()
 }
 
 #[tokio::main]
@@ -32,36 +50,31 @@ async fn main() {
         .map(|device| device.split_once('|').unwrap().0.to_string())
         .collect();
 
+    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
     let mut set = JoinSet::new();
-
-    let message_queue = Arc::new(RwLock::new(VecDeque::<String>::new()));
-    let publish_queue = message_queue.clone();
+    let mut producer = Producer::from_hosts(vec!["kafka:29092".to_owned()])
+        .with_ack_timeout(Duration::from_secs(1))
+        .with_required_acks(RequiredAcks::One)
+        .create()
+        .expect("kafka connection");
 
     set.spawn(async move {
-        let mut producer = Producer::from_hosts(vec!["kafka:29092".to_owned()])
-            .with_ack_timeout(Duration::from_secs(1))
-            .with_required_acks(RequiredAcks::One)
-            .create()
-            .expect("kafka connection");
-        loop {
-            let mut queue = publish_queue.write().await;
-            if let Some(reading) = (*queue).pop_front() {
-                producer
-                    .send(&Record::from_value("test-topic", reading.as_bytes()))
-                    .unwrap();
-                println!("{reading:} published!");
-            };
+        while let Some(reading) = rx.recv().await {
+            producer
+                .send(&Record::from_value("test-topic", reading.as_bytes()))
+                .unwrap();
+            println!("{reading:} published!");
             sleep(Duration::from_secs(2)).await;
         }
     });
 
     for device in devices {
-        let queue = message_queue.clone();
+        let queue = tx.clone();
         set.spawn(async move {
             let mut previous_time: Option<String> = None;
             let client = reqwest::Client::new();
             loop {
-                sleep(Duration::from_millis(1000)).await;
+                sleep(Duration::from_secs(1)).await;
                 let reading = client
                     .get(format!(
                         "https://devel.klimerko.org/api/device/{device:}/latest"
@@ -79,14 +92,14 @@ async fn main() {
                         if let Some(ct) = current_time {
                             if !pt.eq(&ct) {
                                 previous_time = Some(ct.to_string());
-                                queue.write().await.push_front(reading);
+                                queue.send(reading_to_json(&reading, &device)).ok();
                             }
                         }
                     }
                     None => {
                         if let Some(ct) = current_time {
                             previous_time = Some(ct.to_string());
-                            queue.write().await.push_front(reading);
+                            queue.send(reading_to_json(&reading, &device)).ok();
                         }
                     }
                 }
