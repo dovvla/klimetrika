@@ -1,6 +1,7 @@
-use std::collections::HashMap;
-
 use kafka::producer::{Producer, Record, RequiredAcks};
+use rand::seq::SliceRandom;
+use serde_json::json;
+use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 use tokio::time::{sleep, Duration};
@@ -32,7 +33,35 @@ fn reading_to_json(reading: &str, device: &str) -> String {
 
     map.insert("deviceId", device);
 
-    serde_json::to_string(&map).unwrap()
+    map.insert(
+        "city",
+        (vec![
+            "Novi Sad",
+            "Beograd",
+            "Nis",
+            "Subotica",
+            "Valjevo",
+            "Kragujevac",
+        ])
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(&"Tovarisevo"),
+    );
+
+    let ret_val = json!(
+        {
+            "deviceId": map.get("deviceId"),
+            "city": map.get("city"),
+            "time": map.get("time").unwrap().parse::<i128>().unwrap(),
+            "temperature": map.get("temperature").unwrap().parse::<f64>().unwrap(),
+            "humidity": map.get("humidity").unwrap().parse::<f64>().unwrap(),
+            "pressure": map.get("pressure").unwrap().parse::<f64>().unwrap(),
+            "pm1": map.get("pm1").unwrap().parse::<f64>().unwrap(),
+            "pm2": map.get("pm2").unwrap().parse::<f64>().unwrap(),
+            "pm10": map.get("pm10").unwrap().parse::<f64>().unwrap(),
+        }
+    );
+
+    serde_json::to_string(&ret_val).unwrap()
 }
 
 #[tokio::main]

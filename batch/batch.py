@@ -242,7 +242,6 @@ df_atmospheric_pressure_monthly.write.csv(
     BASE_OUTPUT_PATH + "df_atmospheric_pressure_monthly.csv"
 )
 
-# For df_humidity
 df_humidity_monthly = (
     df_humidity.withColumn("year", year("timestamp"))
     .withColumn("month", month("timestamp"))
@@ -256,7 +255,6 @@ df_humidity_monthly = (
 df_humidity_monthly.write.csv(BASE_OUTPUT_PATH + "df_humidity_monthly.csv")
 
 
-# For df_pm_1
 df_pm_1_monthly = (
     df_pm_1.withColumn("year", year("timestamp"))
     .withColumn("month", month("timestamp"))
@@ -270,7 +268,6 @@ df_pm_1_monthly = (
 df_pm_1_monthly.write.csv(BASE_OUTPUT_PATH + "df_pm_1_monthly.csv")
 
 
-# For df_pm_10
 df_pm_10_monthly = (
     df_pm_10.withColumn("year", year("timestamp"))
     .withColumn("month", month("timestamp"))
@@ -284,7 +281,6 @@ df_pm_10_monthly = (
 df_pm_10_monthly.write.csv(BASE_OUTPUT_PATH + "df_pm_10_monthly.csv")
 
 
-# For df_pm_2_5
 df_pm_2_5_monthly = (
     df_pm_2_5.withColumn("year", year("timestamp"))
     .withColumn("month", month("timestamp"))
